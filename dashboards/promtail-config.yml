@@ -1,0 +1,41 @@
+# =====================================================================
+# Promtail — ships Suricata's eve.json into Loki, parsing JSON fields
+# so Grafana can filter by event_type, signature, src_ip, etc.
+# =====================================================================
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: suricata
+    static_configs:
+      - targets: [localhost]
+        labels:
+          job: suricata
+          host: raspberry-pi
+          __path__: /var/log/suricata/eve.json
+    pipeline_stages:
+      # Parse the JSON line
+      - json:
+          expressions:
+            event_type: event_type
+            src_ip: src_ip
+            dest_ip: dest_ip
+            signature: alert.signature
+            severity: alert.severity
+            category: alert.category
+            proto: proto
+      # Promote useful fields to labels (keep cardinality sane)
+      - labels:
+          event_type:
+          severity:
+      # Use Suricata's own timestamp
+      - timestamp:
+          source: timestamp
+          format: RFC3339Nano

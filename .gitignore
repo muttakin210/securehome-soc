@@ -1,0 +1,22 @@
+# Suricata runtime output (never commit captured traffic)
+*.pcap
+*.pcapng
+eve.json
+fast.log
+suricata.log
+raspberry-pi/suricata/logs/
+
+# Loki / Grafana data volumes
+dashboards/loki-data/
+dashboards/grafana-data/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# Secrets — put real passwords/keys here, never in configs
+secrets.env
+*.key
+*.pem

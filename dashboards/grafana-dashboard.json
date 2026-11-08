@@ -1,0 +1,98 @@
+{
+  "__inputs": [
+    {
+      "name": "DS_LOKI",
+      "label": "Loki",
+      "description": "Select your Loki datasource",
+      "type": "datasource",
+      "pluginId": "loki",
+      "pluginName": "Loki"
+    }
+  ],
+  "__requires": [
+    { "type": "datasource", "id": "loki", "name": "Loki", "version": "1.0.0" },
+    { "type": "grafana", "id": "grafana", "name": "Grafana", "version": "11.0.0" }
+  ],
+  "title": "SecureHome SOC — Live Alerts",
+  "uid": "securehome-soc",
+  "tags": ["security", "suricata", "soc"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "type": "stat",
+      "title": "Total alerts (window)",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(count_over_time({job=\"suricata\", event_type=\"alert\"} [$__range]))",
+          "queryType": "instant"
+        }
+      ],
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" }, "thresholds": { "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } } }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Alerts over time",
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (severity) (count_over_time({job=\"suricata\", event_type=\"alert\"} [1m]))",
+          "legendFormat": "severity {{severity}}"
+        }
+      ],
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 60 } } }
+    },
+    {
+      "id": 3,
+      "type": "logs",
+      "title": "Top attacking source IPs",
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 4 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(10, sum by (src_ip) (count_over_time({job=\"suricata\", event_type=\"alert\"} | json | line_format \"{{.src_ip}}\" [$__range])))"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "table",
+      "title": "Alert signatures (what fired)",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 12 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (signature) (count_over_time({job=\"suricata\", event_type=\"alert\"} | json | label_format signature=`{{.signature}}` [$__range]))",
+          "format": "table",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "logs",
+      "title": "Raw alert stream (explain each in the demo)",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 21 },
+      "datasource": { "type": "loki", "uid": "${DS_LOKI}" },
+      "options": { "showTime": true, "wrapLogMessage": true, "dedupStrategy": "none" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "{job=\"suricata\", event_type=\"alert\"} | json | line_format \"{{.timestamp}}  {{.src_ip}} -> {{.dest_ip}}  [{{.signature}}]\""
+        }
+      ]
+    }
+  ]
+}
