@@ -1,0 +1,169 @@
+! =====================================================================
+! SW-ADMIN / SW-SERVER / SW-MGMT  (2960 access switches)
+! Paste each block into the matching switch.
+! =====================================================================
+
+
+! #####################################################################
+! SW-ADMIN  — VLAN 10 (Admin, Registrar, HR, Finance)
+! #####################################################################
+enable
+configure terminal
+hostname SW-ADMIN
+service password-encryption
+username admin privilege 15 secret Str0ng-Admin!
+enable secret Str0ng-Enable!
+spanning-tree mode rapid-pvst
+vlan 10
+ name ADMIN
+vlan 99
+ name MGMT
+exit
+interface gigabitEthernet0/1
+ description Uplink to Distribution/Core
+ switchport mode trunk
+ switchport trunk allowed vlan 10,99
+ ip dhcp snooping trust
+ ip arp inspection trust
+ no shutdown
+exit
+interface range fastEthernet0/1 - 10
+ switchport mode access
+ switchport access vlan 10
+ switchport port-security
+ switchport port-security maximum 1
+ switchport port-security mac-address sticky
+ switchport port-security violation shutdown
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+exit
+interface range fastEthernet0/11 - 24
+ shutdown
+exit
+ip dhcp snooping
+ip dhcp snooping vlan 10,99
+no ip dhcp snooping information option
+ip arp inspection vlan 10
+interface vlan 99
+ ip address 192.168.99.31 255.255.255.0
+ no shutdown
+exit
+ip default-gateway 192.168.99.1
+ip ssh version 2
+line vty 0 4
+ transport input ssh
+ login local
+exit
+end
+write memory
+
+
+! #####################################################################
+! SW-SERVER  — VLAN 100 (Web .10, DB .20, Email .30, File .40, DNS .50)
+! Servers use STATIC IPs; mark the uplink DHCP-snoop trusted.
+! #####################################################################
+enable
+configure terminal
+hostname SW-SERVER
+service password-encryption
+username admin privilege 15 secret Str0ng-Admin!
+enable secret Str0ng-Enable!
+spanning-tree mode rapid-pvst
+vlan 100
+ name SERVER
+vlan 99
+ name MGMT
+exit
+interface gigabitEthernet0/1
+ description Uplink to Distribution/Core
+ switchport mode trunk
+ switchport trunk allowed vlan 100,99
+ ip dhcp snooping trust
+ no shutdown
+exit
+interface range fastEthernet0/1 - 10
+ description Server port
+ switchport mode access
+ switchport access vlan 100
+ switchport port-security
+ switchport port-security maximum 1
+ switchport port-security mac-address sticky
+ switchport port-security violation restrict
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+exit
+interface range fastEthernet0/11 - 24
+ shutdown
+exit
+ip dhcp snooping
+ip dhcp snooping vlan 100,99
+no ip dhcp snooping information option
+interface vlan 99
+ ip address 192.168.99.32 255.255.255.0
+ no shutdown
+exit
+ip default-gateway 192.168.99.1
+ip ssh version 2
+line vty 0 4
+ transport input ssh
+ login local
+exit
+end
+write memory
+!
+! Set each server's NIC statically:
+!   Web   192.168.100.10 /24  gw 192.168.100.1  dns 192.168.100.50
+!   DB    192.168.100.20 /24  gw 192.168.100.1
+!   Email 192.168.100.30 /24  gw 192.168.100.1
+!   File  192.168.100.40 /24  gw 192.168.100.1
+!   DNS   192.168.100.50 /24  gw 192.168.100.1
+
+
+! #####################################################################
+! SW-MGMT  — VLAN 99 (Admin PC .10, NMS server .20)
+! #####################################################################
+enable
+configure terminal
+hostname SW-MGMT
+service password-encryption
+username admin privilege 15 secret Str0ng-Admin!
+enable secret Str0ng-Enable!
+spanning-tree mode rapid-pvst
+vlan 99
+ name MGMT
+exit
+interface gigabitEthernet0/1
+ description Uplink to Distribution/Core
+ switchport mode trunk
+ switchport trunk allowed vlan 99
+ ip dhcp snooping trust
+ no shutdown
+exit
+interface range fastEthernet0/1 - 10
+ switchport mode access
+ switchport access vlan 99
+ switchport port-security
+ switchport port-security maximum 1
+ switchport port-security mac-address sticky
+ switchport port-security violation shutdown
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+exit
+interface range fastEthernet0/11 - 24
+ shutdown
+exit
+ip dhcp snooping
+ip dhcp snooping vlan 99
+no ip dhcp snooping information option
+interface vlan 99
+ ip address 192.168.99.33 255.255.255.0
+ no shutdown
+exit
+ip default-gateway 192.168.99.1
+ip ssh version 2
+line vty 0 4
+ transport input ssh
+ login local
+exit
+end
+write memory

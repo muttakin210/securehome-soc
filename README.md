@@ -136,6 +136,10 @@ Never run them against systems you do not own or have written permission to test
 - [WiFi Security — hands-on guide](learn/wifi-security/README.md) — WPA2 handshake
   capture + crack (aircrack-ng/hashcat), analysing it in Wireshark, WPS/evil-twin,
   and how to harden your own WiFi. Own-network / authorized testing only.
+- [University Campus Network — secure design](projects/university-network/README.md)
+  — a full 3-tier campus network (Core/Distribution/Access, 9 VLANs, HSRP +
+  EtherChannel redundancy, ASA firewall) with ready-to-paste Cisco configs and
+  layered security (segmentation ACLs, port security, DHCP snooping + DAI).
 
 ## 🧰 Built with
 

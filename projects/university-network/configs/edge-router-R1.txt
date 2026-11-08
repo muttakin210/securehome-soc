@@ -1,0 +1,63 @@
+! =====================================================================
+! R1 — Edge Router (ISR 2911)
+! Role: Internet gateway, NAT/PAT for the whole campus, route to ASA, hardening
+!   Gi0/0 = ISP (outside)        Gi0/1 = to ASA outside (inside)   203.0.113.0/30
+! =====================================================================
+enable
+configure terminal
+hostname R1
+no ip domain-lookup
+ip domain-name univ.local
+!
+username admin privilege 15 secret Str0ng-Admin!
+enable secret Str0ng-Enable!
+service password-encryption
+login block-for 60 attempts 5 within 30
+banner motd #Authorized access only.#
+!
+! ---- WAN to ISP ----
+interface gigabitEthernet0/0
+ description === ISP / Internet ===
+ ip address dhcp
+ ip nat outside
+ no shutdown
+exit
+!
+! ---- Link to ASA outside ----
+interface gigabitEthernet0/1
+ description === To ASA outside ===
+ ip address 203.0.113.1 255.255.255.252
+ ip nat inside
+ ip access-group OUTSIDE-IN in
+ no shutdown
+exit
+!
+! ---- routing ----
+ip route 192.168.0.0 255.255.0.0 203.0.113.2     ! campus is behind the ASA
+! default route to ISP usually comes from DHCP; else:
+! ip route 0.0.0.0 0.0.0.0 <ISP-gateway>
+!
+! ---- NAT / PAT: hide the whole 192.168.0.0/16 behind the WAN IP ----
+ip access-list standard NAT-INSIDE
+ permit 192.168.0.0 0.0.255.255
+ip nat inside source list NAT-INSIDE interface gigabitEthernet0/0 overload
+!
+! ---- inbound filter from the ASA side (anti-spoof + allow replies) ----
+ip access-list extended OUTSIDE-IN
+ permit ip 192.168.0.0 0.0.255.255 any     ! campus traffic heading out
+ deny   ip any any
+!
+! ---- management ----
+crypto key generate rsa modulus 2048
+ip ssh version 2
+line vty 0 4
+ transport input ssh
+ login local
+ exec-timeout 5 0
+exit
+no ip http server
+no ip http secure-server
+end
+write memory
+!
+! VERIFY: show ip nat translations ; show ip route

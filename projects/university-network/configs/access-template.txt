@@ -1,0 +1,89 @@
+! =====================================================================
+! ACCESS switch template  (SW-MATH, SW-PHYS, ... per department)  — Layer 2
+! Role: connect end-user PCs in one faculty VLAN + full L2 security hardening.
+! Set <VLAN> to the faculty VLAN (Science=20, Eng=30, Business=40,
+!   Law=50, Education=60, Arts=70). Rename hostname per switch.
+! =====================================================================
+enable
+configure terminal
+hostname SW-MATH
+no ip domain-lookup
+!
+username admin privilege 15 secret Str0ng-Admin!
+enable secret Str0ng-Enable!
+ip domain-name univ.local
+service password-encryption
+banner motd #Authorized access only.#
+!
+spanning-tree mode rapid-pvst
+!
+vlan 20
+ name SCIENCE        ! <VLAN> for this faculty
+vlan 99
+ name MGMT
+exit
+!
+! ---- Uplink trunk to the distribution switch ----
+interface gigabitEthernet0/1
+ description === Uplink to Distribution ===
+ switchport mode trunk
+ switchport trunk allowed vlan 20,99
+ no shutdown
+exit
+!
+! =====================================================================
+! Access ports to PCs: VLAN 20 + port security + STP protection
+! =====================================================================
+interface range fastEthernet0/1 - 20
+ description === User PC ===
+ switchport mode access
+ switchport access vlan 20
+ switchport port-security
+ switchport port-security maximum 2
+ switchport port-security mac-address sticky
+ switchport port-security violation shutdown
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+ ip dhcp snooping limit rate 15
+exit
+!
+! ---- shut unused ports ----
+interface range fastEthernet0/21 - 24
+ shutdown
+exit
+!
+! =====================================================================
+! DHCP Snooping + Dynamic ARP Inspection (anti rogue-DHCP / ARP-spoof)
+! The UPLINK to distribution is trusted (real DHCP/gateway is upstream).
+! =====================================================================
+ip dhcp snooping
+ip dhcp snooping vlan 20,99
+no ip dhcp snooping information option
+ip arp inspection vlan 20
+interface gigabitEthernet0/1
+ ip dhcp snooping trust
+ ip arp inspection trust
+exit
+!
+! ---- management (VLAN 99 SVI) ----
+interface vlan 99
+ ip address 192.168.99.21 255.255.255.0    ! unique per access switch
+ no shutdown
+exit
+ip default-gateway 192.168.99.1
+!
+crypto key generate rsa modulus 2048
+ip ssh version 2
+line vty 0 4
+ transport input ssh
+ login local
+ exec-timeout 5 0
+exit
+end
+write memory
+!
+! VERIFY:
+!   show port-security            (ports secured, violation shutdown)
+!   show ip dhcp snooping          (enabled; Gi0/1 trusted)
+!   show ip arp inspection         (enabled on VLAN 20)
+!   show spanning-tree summary     (BPDU guard active on access ports)
