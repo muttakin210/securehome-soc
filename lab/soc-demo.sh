@@ -36,43 +36,58 @@ fi
 
 # ---- 1. detection rules --------------------------------------------
 cyan "1. Installing custom detection rules"
+RULES_FILE="/etc/suricata/rules/securehome.rules"
 sudo mkdir -p /etc/suricata/rules
-sudo tee /etc/suricata/rules/securehome.rules >/dev/null <<'RULES'
-alert tcp any any -> $HOME_NET any (msg:"SECUREHOME Nmap port scan"; flags:S; flow:to_server; threshold:type both, track by_src, count 30, seconds 5; classtype:attempted-recon; sid:1000001; rev:1;)
-alert tcp any any -> $HOME_NET 22 (msg:"SECUREHOME SSH brute-force"; flow:to_server; flags:S; threshold:type both, track by_src, count 10, seconds 20; classtype:attempted-admin; sid:1000010; rev:1;)
+sudo tee "$RULES_FILE" >/dev/null <<'RULES'
+alert tcp any any -> $HOME_NET any (msg:"SECUREHOME Nmap port scan"; flags:S; flow:to_server; threshold:type both, track by_src, count 20, seconds 10; classtype:attempted-recon; sid:1000001; rev:2;)
+alert tcp any any -> $HOME_NET 22 (msg:"SECUREHOME SSH brute-force"; flags:S; flow:to_server; threshold:type both, track by_src, count 5, seconds 20; classtype:attempted-admin; sid:1000010; rev:2;)
 RULES
-grep -q 'securehome.rules' /etc/suricata/suricata.yaml \
-  || sudo sed -i '/^rule-files:/a\  - securehome.rules' /etc/suricata/suricata.yaml
 
-# ---- 2. start Suricata IDS ------------------------------------------
+# ---- 2. start Suricata IDS (load ONLY our rules with -S, absolute path) ----
 cyan "2. Starting Suricata IDS on $IFACE"
-sudo pkill -f 'suricata -i' 2>/dev/null || true
+sudo pkill -f 'suricata ' 2>/dev/null || true
+sleep 2
 sudo rm -f /var/log/suricata/eve.json
-sudo suricata -i "$IFACE" -l /var/log/suricata -D
-echo "   waiting for Suricata to initialise..."; sleep 10
+sudo suricata -S "$RULES_FILE" -i "$IFACE" -l /var/log/suricata -D
+echo "   waiting for Suricata to initialise..."; sleep 12
+if ! pgrep -x suricata >/dev/null; then
+  echo "Suricata failed to start — log:"; sudo tail -n 15 /var/log/suricata/suricata.log
+fi
 
 # ---- 3. ATTACKS -----------------------------------------------------
 cyan "3a. Recon — host discovery on $NET"
 nmap -sn "$NET"
 
-cyan "3b. Recon — full service scan of $TARGET"
-nmap -sV "$TARGET" | tee scan.txt
+cyan "3b. Recon — SYN scan of $TARGET (generates the scan signature)"
+sudo nmap -sS -T4 "$TARGET" | tee scan.txt
 
-cyan "3c. SSH brute-force on $TARGET"
+cyan "3c. Full service/version scan of $TARGET"
+nmap -sV "$TARGET" | tee -a scan.txt
+
+cyan "3d. SSH brute-force on $TARGET"
+# Burst of TCP connects to port 22 -> reliably triggers the SSH-brute rule,
+# even though Metasploitable's legacy SSH refuses modern hydra negotiation.
+for i in $(seq 1 15); do
+  timeout 1 bash -c "exec 3<>/dev/tcp/$TARGET/22" 2>/dev/null
+done
+# Also run the real tool (may error on the old SSH algos; that's fine).
 printf 'root\nmsfadmin\npassword\n123456\nadmin\n' > wl.txt
 hydra -l msfadmin -P wl.txt "ssh://$TARGET" -t 4 -f 2>&1 | tee hydra.txt || true
 
 # ---- 4. DETECTIONS --------------------------------------------------
 cyan "4. Suricata ALERTS  (the attack -> detect loop)"
-sleep 6
-if sudo test -s /var/log/suricata/eve.json; then
+sleep 8
+EVE=/var/log/suricata/eve.json
+if sudo test -s "$EVE"; then
   sudo jq -r 'select(.event_type=="alert")
         | "\(.timestamp[11:19])  \(.src_ip) -> \(.dest_ip)   [\(.alert.signature)]"' \
-        /var/log/suricata/eve.json | sort -u
+        "$EVE" 2>/dev/null | sort -u
   echo
-  grn "Alert count: $(sudo grep -ac '"event_type":"alert"' /var/log/suricata/eve.json)"
+  grn "Alert count: $(sudo grep -ac '\"event_type\":\"alert\"' "$EVE")"
+  [ "$(sudo grep -ac '\"event_type\":\"alert\"' "$EVE")" = "0" ] && \
+    { echo "No alerts — Suricata log tail:"; sudo tail -n 15 /var/log/suricata/suricata.log; }
 else
-  echo "No eve.json yet — check: sudo tail /var/log/suricata/suricata.log"
+  echo "No eve.json — Suricata log tail:"; sudo tail -n 15 /var/log/suricata/suricata.log
 fi
 
 cyan "DONE — recon -> attack -> detect, all in one run"
