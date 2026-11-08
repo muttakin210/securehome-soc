@@ -91,6 +91,10 @@ securehome-soc/
 
 ## 🚀 Quick start
 
+> **Already have VirtualBox VMs (Kali, Metasploitable, etc.)?** Skip GNS3 and run
+> the whole attack→detect demo on your existing VMs — see
+> [`docs/virtualbox-lab.md`](docs/virtualbox-lab.md).
+
 1. **Laptop:** install [GNS3](https://gns3.com) (or EVE-NG). Build the topology
    in `docs/topology.md`, then paste the configs from `cisco/` into each device.
 2. **Raspberry Pi:** flash Raspberry Pi OS Lite, then run:
