@@ -20,3 +20,6 @@ Thumbs.db
 secrets.env
 *.key
 *.pem
+
+# stray nested clone
+securehome-soc/
