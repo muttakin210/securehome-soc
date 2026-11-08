@@ -133,6 +133,9 @@ Never run them against systems you do not own or have written permission to test
 - [Cisco Security — hands-on lab course](learn/cisco-security/README.md) — 5
   progressive Packet Tracer labs: port security, DHCP snooping + DAI, VLAN/ACL
   segmentation, router ACL/NAT, and SSH/AAA hardening.
+- [WiFi Security — hands-on guide](learn/wifi-security/README.md) — WPA2 handshake
+  capture + crack (aircrack-ng/hashcat), analysing it in Wireshark, WPS/evil-twin,
+  and how to harden your own WiFi. Own-network / authorized testing only.
 
 ## 🧰 Built with
 
