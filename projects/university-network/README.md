@@ -98,6 +98,10 @@ Build it in **Cisco Packet Tracer** (or real gear). Paste the configs from
 
 ---
 
+> 🛠️ **Building it in Packet Tracer?** Follow the step-by-step
+> [**BUILD-GUIDE.md**](BUILD-GUIDE.md) — device list, exact cable map, and a
+> phased build with save points and verify checks.
+
 ## 4. Build order (paste configs in this order)
 
 1. **Core switches** — [`configs/core-sw1.txt`](configs/core-sw1.txt),
