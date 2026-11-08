@@ -54,8 +54,15 @@ interface Port-channel1
  switchport mode trunk
 exit
 !
-interface range gigabitEthernet0/3 - 8
+! 3560-24PS has only Gi0/1-2 (used by Po1), so downlinks use FastEthernet.
+interface range fastEthernet0/1 - 6
  description === Trunk to Distribution ===
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ no shutdown
+exit
+interface range fastEthernet0/8 - 10
+ description === Trunk to Admin/Server/Mgmt ===
  switchport trunk encapsulation dot1q
  switchport mode trunk
  no shutdown

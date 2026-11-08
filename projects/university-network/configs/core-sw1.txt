@@ -59,16 +59,27 @@ interface Port-channel1
  switchport mode trunk
 exit
 !
-! ---- Trunks DOWN to distribution switches (Gi0/3 - 0/8 -> D-SW1..6) ----
-interface range gigabitEthernet0/3 - 8
+! NOTE: a 3560-24PS has only 2 GigabitEthernet ports (Gi0/1-2, used by Po1),
+! so all downlinks use FastEthernet ports.
+!
+! ---- Trunks DOWN to distribution switches (Fa0/1 - 6 -> D-SW1..6) ----
+interface range fastEthernet0/1 - 6
  description === Trunk to Distribution ===
  switchport trunk encapsulation dot1q
  switchport mode trunk
  no shutdown
 exit
 !
-! ---- Routed access to ASA (VLAN 200 transit; ASA inside = .1) ----
-interface gigabitEthernet0/9
+! ---- Trunks to Admin / Server / Mgmt access switches ----
+interface range fastEthernet0/8 - 10
+ description === Trunk to Admin/Server/Mgmt ===
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ no shutdown
+exit
+!
+! ---- Access to ASA inside (VLAN 200 transit; ASA inside = .1) ----
+interface fastEthernet0/7
  description === Link to ASA inside ===
  switchport access vlan 200
  switchport mode access

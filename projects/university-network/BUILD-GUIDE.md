@@ -40,14 +40,16 @@ run the phase's verify step before moving on.
 | CORE-SW1 | Gi0/2 | CORE-SW2 | Gi0/2 | *(Po1 — cross-over)* |
 
 **Cores ↔ Distribution** (each D-SW dual-homes to BOTH cores — cross-over)
+> A 3560-24PS has only 2 Gig ports (used by Po1), so the core side of these
+> links uses **FastEthernet** ports.
 | D-SW | to CORE-SW1 | to CORE-SW2 |
 |------|-------------|-------------|
-| D-SW1 | CORE-SW1 Gi0/3 ↔ D-SW1 Gi0/1 | CORE-SW2 Gi0/3 ↔ D-SW1 Gi0/2 |
-| D-SW2 | CORE-SW1 Gi0/4 ↔ D-SW2 Gi0/1 | CORE-SW2 Gi0/4 ↔ D-SW2 Gi0/2 |
-| D-SW3 | CORE-SW1 Gi0/5 ↔ D-SW3 Gi0/1 | CORE-SW2 Gi0/5 ↔ D-SW3 Gi0/2 |
-| D-SW4 | CORE-SW1 Gi0/6 ↔ D-SW4 Gi0/1 | CORE-SW2 Gi0/6 ↔ D-SW4 Gi0/2 |
-| D-SW5 | CORE-SW1 Gi0/7 ↔ D-SW5 Gi0/1 | CORE-SW2 Gi0/7 ↔ D-SW5 Gi0/2 |
-| D-SW6 | CORE-SW1 Gi0/8 ↔ D-SW6 Gi0/1 | CORE-SW2 Gi0/8 ↔ D-SW6 Gi0/2 |
+| D-SW1 | CORE-SW1 Fa0/1 ↔ D-SW1 Fa0/1 | CORE-SW2 Fa0/1 ↔ D-SW1 Fa0/2 |
+| D-SW2 | CORE-SW1 Fa0/2 ↔ D-SW2 Fa0/1 | CORE-SW2 Fa0/2 ↔ D-SW2 Fa0/2 |
+| D-SW3 | CORE-SW1 Fa0/3 ↔ D-SW3 Fa0/1 | CORE-SW2 Fa0/3 ↔ D-SW3 Fa0/2 |
+| D-SW4 | CORE-SW1 Fa0/4 ↔ D-SW4 Fa0/1 | CORE-SW2 Fa0/4 ↔ D-SW4 Fa0/2 |
+| D-SW5 | CORE-SW1 Fa0/5 ↔ D-SW5 Fa0/1 | CORE-SW2 Fa0/5 ↔ D-SW5 Fa0/2 |
+| D-SW6 | CORE-SW1 Fa0/6 ↔ D-SW6 Fa0/1 | CORE-SW2 Fa0/6 ↔ D-SW6 Fa0/2 |
 
 **Distribution ↔ Access** (cross-over) and **Access ↔ PCs** (straight-through)
 | Faculty | D-SW | Access SW | VLAN |
@@ -62,9 +64,11 @@ run the phase's verify step before moving on.
 **Admin / Server / Mgmt** (connect to the cores — cross-over)
 | From | Port | To | Port | VLAN |
 |------|------|----|------|------|
-| SW-ADMIN | Gi0/1 | CORE-SW1 | Gi0/10 | 10 |
-| SW-SERVER | Gi0/1 | CORE-SW1 | Gi0/11 | 100 |
-| SW-MGMT | Gi0/1 | CORE-SW1 | Gi0/12 | 99 |
+| SW-ADMIN | Gi0/1 | CORE-SW1 | Fa0/8 | 10 |
+| SW-SERVER | Gi0/1 | CORE-SW1 | Fa0/9 | 100 |
+| SW-MGMT | Gi0/1 | CORE-SW1 | Fa0/10 | 99 |
+
+> The ASA inside link uses **CORE-SW1 Fa0/7** (VLAN 200 transit).
 | Admin PCs | Fa | SW-ADMIN Fa0/1–4 | — | 10 |
 | 5 Servers | Fa | SW-SERVER Fa0/1–5 | — | 100 |
 
